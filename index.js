@@ -23,9 +23,10 @@ app.post('/api/render-pdf', async (req, res) => {
 
   let browser;
   try {
+    // Use puppeteer.executablePath() to dynamically find the installed Chrome
     browser = await puppeteer.launch({
       headless: 'new',
-      executablePath: '/opt/render/.cache/puppeteer/chrome/linux-143.0.7499.40/chrome-linux64/chrome',
+      executablePath: puppeteer.executablePath(),
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -33,7 +34,6 @@ app.post('/api/render-pdf', async (req, res) => {
         '--disable-gpu',
       ],
     });
-
     const page = await browser.newPage();
 
     if (metadata && metadata.title) {
