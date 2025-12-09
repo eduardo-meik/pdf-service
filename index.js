@@ -6,12 +6,6 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Logging middleware
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Origin: ${req.get('origin')}`);
-  next();
-});
-
 // Configure CORS to allow requests from any origin (for debugging/flexibility)
 const corsOptions = {
   origin: true, // Reflects the request origin, effectively allowing all
@@ -22,6 +16,12 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Origin: ${req.get('origin')}`);
+  next();
+});
 
 app.use(express.json({ limit: '10mb' }));
 
