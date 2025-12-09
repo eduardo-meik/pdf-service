@@ -1,9 +1,14 @@
 const puppeteer = require('puppeteer');
+const { execSync } = require('child_process');
 
 async function main() {
   try {
-    // This will resolve (and download if needed) the Chrome executable
-    const executablePath = await puppeteer.executablePath();
+    console.log('Installing Chrome for Puppeteer...');
+    // Force install chrome to the configured cache directory
+    execSync('npx puppeteer browsers install chrome', { stdio: 'inherit' });
+    
+    // This will resolve the Chrome executable
+    const executablePath = puppeteer.executablePath();
     console.log('Chrome executable path for Puppeteer:', executablePath);
     console.log('Chrome installed or already available for Puppeteer.');
   } catch (err) {

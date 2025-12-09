@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const puppeteer = require('puppeteer');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,10 +24,23 @@ app.post('/api/render-pdf', async (req, res) => {
 
   let browser;
   try {
+    const executablePath = puppeteer.executablePath();
+    if (!fs.existsSync(executablePath)) {
+      console.error('Browser executable not found at:', executablePath);
+      console.error('Current directory:', process.cwd());
+      try {
+        // List contents of the cache directory to debug
+        const cacheDir = require('path').dirname(executablePath);
+        console.error(`Contents of ${cacheDir}:`, fs.readdirSync(cacheDir));
+      } catch (e) {
+        console.error('Could not list cache directory:', e.message);
+      }
+    }
+
     // Use puppeteer.executablePath() to dynamically find the installed Chrome
     browser = await puppeteer.launch({
       headless: 'new',
-      executablePath: puppeteer.executablePath(),
+      executablePath: executablePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
