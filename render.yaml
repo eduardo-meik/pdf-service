@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: pdf-service
+    env: docker
+    plan: free
+    branch: main
+    repo: https://github.com/eduardo-meik/pdf-service
+    region: oregon
+    envVars:
+      - key: PORT
+        value: 10000
