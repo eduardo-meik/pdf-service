@@ -6,7 +6,23 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// Configure CORS to allow requests from the frontend
+const corsOptions = {
+  origin: [
+    'https://gestion.colegiowinterhill.cl',
+    'http://localhost:3000',
+    'http://localhost:5173' // Common local dev port
+  ],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+// Explicitly handle preflight requests
+app.options('*', cors(corsOptions));
+
 app.use(express.json({ limit: '10mb' }));
 
 app.get('/', (req, res) => {
