@@ -47,7 +47,7 @@ app.post('/api/render-pdf', async (req, res) => {
 
     // Use puppeteer.executablePath() to dynamically find the installed Chrome
     browser = await puppeteer.launch({
-      headless: 'new',
+      headless: true,
       executablePath: executablePath,
       args: [
         '--no-sandbox',

@@ -1,4 +1,4 @@
-FROM node:22-slim
+FROM node:20-slim
 
 # Install dependencies for Puppeteer
 # We install google-chrome-stable to get all necessary shared libraries, 
@@ -15,11 +15,14 @@ RUN apt-get update \
 # Create app directory
 WORKDIR /usr/src/app
 
+# Set Puppeteer cache directory explicitly
+ENV PUPPETEER_CACHE_DIR=/usr/src/app/puppeteer-cache
+
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies
-# This will also run the postinstall script (install-chrome.js) which downloads the correct Chrome version
+# Puppeteer will download Chrome to PUPPETEER_CACHE_DIR during install
 RUN npm ci
 
 # Copy app source
