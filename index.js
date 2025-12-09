@@ -6,13 +6,15 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configure CORS to allow requests from the frontend
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Origin: ${req.get('origin')}`);
+  next();
+});
+
+// Configure CORS to allow requests from any origin (for debugging/flexibility)
 const corsOptions = {
-  origin: [
-    'https://gestion.colegiowinterhill.cl',
-    'http://localhost:3000',
-    'http://localhost:5173' // Common local dev port
-  ],
+  origin: true, // Reflects the request origin, effectively allowing all
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
