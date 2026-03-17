@@ -7,7 +7,7 @@ RUN apt-get update \
        ca-certificates fonts-freefont-ttf libx11-xcb1 libxcomposite1 \
        libxdamage1 libxrandr2 libgbm1 libasound2 libatk1.0-0 \
        libatk-bridge2.0-0 libcups2 libdrm2 libnss3 libxss1 libxtst6 \
-       libpango-1.0-0 libcairo2 \
+       libpango-1.0-0 libcairo2 libxkbcommon0 libglib2.0-0 libdbus-1-3 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app

@@ -94,11 +94,11 @@ app.post('/api/render-pdf', async (req, res) => {
     const browser = await getBrowser();
     page = await browser.newPage();
 
-    // Block external resources — the HTML should be self-contained
+    // Block only media/video to save bandwidth; allow stylesheets, fonts, images, scripts
     await page.setRequestInterception(true);
     page.on('request', (request) => {
       const type = request.resourceType();
-      if (['image', 'media', 'font', 'stylesheet', 'script'].includes(type) && request.url().startsWith('http')) {
+      if (['media', 'websocket', 'manifest', 'other'].includes(type)) {
         request.abort();
       } else {
         request.continue();
