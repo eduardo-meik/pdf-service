@@ -1,23 +1,61 @@
 const express = require('express');
 const cors = require('cors');
 const puppeteer = require('puppeteer');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configure CORS to allow requests from any origin (for debugging/flexibility)
-const corsOptions = {
-  origin: true, // Reflects the request origin, effectively allowing all
+// --- Browser singleton ---
+// Reusing a single browser instance avoids the ~300MB+ overhead of launching
+// Chromium on every request, which is the #1 cause of timeouts on low-resource hosts.
+let browserInstance = null;
+
+const CHROME_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+  '--disable-extensions',
+  '--disable-background-networking',
+  '--disable-default-apps',
+  '--disable-sync',
+  '--disable-translate',
+  '--metrics-recording-only',
+  '--no-first-run',
+  '--mute-audio',
+  '--hide-scrollbars',
+  '--single-process',          // critical for low-CPU environments
+  '--disable-background-timer-throttling',
+  '--disable-backgrounding-occluded-windows',
+  '--disable-renderer-backgrounding',
+  '--font-render-hinting=none',
+  '--js-flags=--max-old-space-size=256',
+];
+
+async function getBrowser() {
+  if (browserInstance && browserInstance.connected) {
+    return browserInstance;
+  }
+  browserInstance = await puppeteer.launch({
+    headless: true,
+    args: CHROME_ARGS,
+    protocolTimeout: 120_000,
+  });
+  browserInstance.on('disconnected', () => {
+    browserInstance = null;
+  });
+  return browserInstance;
+}
+
+// --- Express setup ---
+app.use(cors({
+  origin: true,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-  optionsSuccessStatus: 200
-};
+  optionsSuccessStatus: 200,
+}));
 
-app.use(cors(corsOptions));
-
-// Logging middleware
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Origin: ${req.get('origin')}`);
   next();
@@ -29,8 +67,13 @@ app.get('/', (req, res) => {
   res.send('PDF Service is running');
 });
 
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+app.get('/health', async (req, res) => {
+  try {
+    const browser = await getBrowser();
+    res.status(200).json({ status: 'ok', browserConnected: browser.connected });
+  } catch {
+    res.status(503).json({ status: 'degraded' });
+  }
 });
 
 app.post('/api/render-pdf', async (req, res) => {
@@ -46,61 +89,61 @@ app.post('/api/render-pdf', async (req, res) => {
     return res.status(400).json({ error: 'html is required and must be a string' });
   }
 
-  let browser;
+  let page;
   try {
-    const executablePath = puppeteer.executablePath();
-    if (!fs.existsSync(executablePath)) {
-      console.error('Browser executable not found at:', executablePath);
-      console.error('Current directory:', process.cwd());
-      try {
-        // List contents of the cache directory to debug
-        const cacheDir = require('path').dirname(executablePath);
-        console.error(`Contents of ${cacheDir}:`, fs.readdirSync(cacheDir));
-      } catch (e) {
-        console.error('Could not list cache directory:', e.message);
-      }
-    }
+    const browser = await getBrowser();
+    page = await browser.newPage();
 
-    // Use puppeteer.executablePath() to dynamically find the installed Chrome
-    browser = await puppeteer.launch({
-      headless: true,
-      executablePath: executablePath,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
+    // Block external resources — the HTML should be self-contained
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      const type = request.resourceType();
+      if (['image', 'media', 'font', 'stylesheet', 'script'].includes(type) && request.url().startsWith('http')) {
+        request.abort();
+      } else {
+        request.continue();
+      }
     });
-    const page = await browser.newPage();
 
     if (metadata && metadata.title) {
-      await page.evaluateOnNewDocument(title => {
+      await page.evaluateOnNewDocument((title) => {
         document.title = title;
       }, metadata.title);
     }
 
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    // 'domcontentloaded' is much faster than 'networkidle0' —
+    // since we're rendering self-contained HTML, we don't need to wait for network.
+    await page.setContent(html, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
 
     const pdfBuffer = await page.pdf({
       format,
       landscape: orientation === 'landscape',
       printBackground: true,
       margin,
+      timeout: 60_000,
     });
-
-    await browser.close();
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline; filename="documento.pdf"');
     return res.send(pdfBuffer);
   } catch (error) {
-    if (browser) {
-      await browser.close();
-    }
     console.error('Error generating PDF:', error);
     return res.status(500).json({ error: 'Failed to generate PDF', details: error.message });
+  } finally {
+    // Close the PAGE, not the browser
+    if (page) {
+      await page.close().catch(() => {});
+    }
   }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  if (browserInstance) await browserInstance.close().catch(() => {});
+  process.exit(0);
 });
 
 app.listen(PORT, () => {
